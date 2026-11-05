@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fart Raft: Chuyến Xe Đẩy Hơi - Bản Kinh Dị Nâng Cấp</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a0a;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        #game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            border: 4px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+            background: #111;
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 8px;
+        }
+        /* Nút điều khiển cảm ứng cho điện thoại */
+        .mobile-controls {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            width: 100%;
+            max-width: 800px;
+            justify-content: center;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+        .control-btn {
+            flex: 1;
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            color: white;
+            border: none;
+            padding: 18px 0;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            box-shadow: 0 6px 0 #d63031, 0 10px 20px rgba(0,0,0,0.4);
+            cursor: pointer;
+            outline: none;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .control-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #d63031, 0 5px 10px rgba(0,0,0,0.4);
+        }
+        .controls-hint {
+            color: #888;
+            margin-top: 10px;
+            font-size: 13px;
+            text-align: center;
+        }
+        span.key {
+            background: #333;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            border-bottom: 2px solid #111;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="800" height="480"></canvas>
+    
+    <!-- 2 nút điều khiển cảm ứng cho điện thoại -->
+    <div class="mobile-controls">
+        <button class="control-btn" id="leftBtn">👈 BƠM HƠI TRÁI (A)</button>
+        <button class="control-btn" id="rightBtn">BƠM HƠI PHẢI (D) 👉</button>
+    </div>
+
+    <div class="controls-hint">
+        Máy tính: Dùng phím <span class="key">A</span> và <span class="key">D</span> | Né gai, tránh Vùng Đất Tối có Ma hù, đi đến Vạch Đích!
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Khởi tạo Audio Context
+let audioCtx = null;
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+// Âm thanh "Fart" hài hước
+function playFartSound() {
+    if (!audioCtx) return;
+    try {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        let biquad = audioCtx.createBiquadFilter();
+        osc.type = 'sawtooth';
+        let startTime = audioCtx.currentTime;
+        osc.frequency.setValueAtTime(80 + Math.random() * 60, startTime);
+        osc.frequency.exponentialRampToValueAtTime(30, startTime + 0.3);
+        biquad.type = 'lowpass';
+        biquad.frequency.value = 400;
+        gain.gain.setValueAtTime(0.5, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+        osc.connect(biquad);
+        biquad.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.3);
+    } catch(e) {}
+}
+
+// Âm thanh Jumpscare Ma hù rợn người
+function playJumpscareSound() {
+    if (!audioCtx) return;
+    try {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        let t = audioCtx.currentTime;
+        osc.frequency.setValueAtTime(600, t);
+        osc.frequency.exponentialRampToValueAtTime(150, t + 0.6);
+        gain.gain.setValueAtTime(0.7, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.6);
+    } catch(e) {}
+}
+
+function playWinSound() {
+    if (!audioCtx) return;
+    try {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+    } catch(e){}
+}
+
+function playHitSound() {
+    if (!audioCtx) return;
+    try {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+    } catch(e){}
+}
+
+// Trạng thái trò chơi
+let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER, WIN
+let difficulty = 'NORMAL'; // EASY, NORMAL, HARD
+let cameraY = 0;
+let targetY = 0;
+const TRACK_HEIGHT = 4000;
+
+// Cấu hình thông số theo độ khó
+let config = {
+    speed: -2.2,
+    obstacleDensity: 200,
+    pushForce: 3.5
+};
+
+function setDifficulty(diff) {
+    difficulty = diff;
+    if (diff === 'EASY') {
+        config.speed = -1.8;
+        config.obstacleDensity = 260;
+        config.pushForce = 4.0;
+    } else if (diff === 'NORMAL') {
+        config.speed = -2.3;
+        config.obstacleDensity = 200;
+        config.pushForce = 3.5;
+    } else if (diff === 'HARD') {
+        config.speed = -3.0;
+        config.obstacleDensity = 150;
+        config.pushForce = 3.0;
+    }
+}
+
+// Phao và Thú
+let raft = {
+    x: 400,
+    y: TRACK_HEIGHT - 300,
+    vx: 0,
+    vy: -2.2,
+    width: 140,
+    height: 40,
+    angle: 0,
+    vAngle: 0
+};
+
+let particles = [];
+let bubbles = [];
+
+// Khởi tạo chướng ngại vật (Bãi gai)
+let obstacles = [];
+// Khởi tạo vùng đất tối (Dark Zones / Ma hù)
+let darkZones = [];
+let activeJumpscare = null; // Lưu thông tin ma đang hù
+
+function generateMap() {
+    obstacles = [];
+    darkZones = [];
+    
+    // Tạo bãi gai
+    for (let i = 500; i < TRACK_HEIGHT - 400; i += config.obstacleDensity) {
+        let side = Math.random() > 0.5 ? 'left' : 'right';
+        obstacles.push({
+            y: i,
+            side: side,
+            width: 120 + Math.random() * 70,
+            height: 35
+        });
+    }
+
+    // Tạo các vùng đất tối (mỗi 800 đơn vị chiều cao có 1 vùng ma ám)
+    for (let i = 1000; i < TRACK_HEIGHT - 600; i += 900) {
+        darkZones.push({
+            y: i,
+            height: 300,
+            triggered: false
+        });
+    }
+}
+
+// Điều khiển bàn phím
+window.addEventListener('keydown', (e) => {
+    initAudio();
+    if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') triggerFart('left');
+    if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') triggerFart('right');
+    if (e.key === 'r' || e.key === 'R') resetGame();
+});
+
+// Điều khiển cảm ứng nút di động
+document.getElementById('leftBtn').addEventListener('touchstart', (e) => { e.preventDefault(); initAudio(); triggerFart('left'); });
+document.getElementById('rightBtn').addEventListener('touchstart', (e) => { e.preventDefault(); initAudio(); triggerFart('right'); });
+document.getElementById('leftBtn').addEventListener('click', () => { initAudio(); triggerFart('left'); });
+document.getElementById('rightBtn').addEventListener('click', () => { initAudio(); triggerFart('right'); });
+
+function triggerFart(side) {
+    if (gameState !== 'PLAYING') return;
+    // Nếu đang bị ma hù giật mình, thao tác sẽ bị chậm hoặc khó hơn chút
+    playFartSound();
+    
+    if (side === 'left') {
+        raft.vx += config.pushForce;
+        raft.vAngle += 0.03;
+        for(let i=0; i<8; i++) {
+            particles.push({
+                x: raft.x - 50 + Math.random()*20,
+                y: raft.y + 10 + Math.random()*15,
+                vx: -2 - Math.random()*3,
+                vy: (Math.random()-0.5)*2,
+                radius: 6 + Math.random()*8,
+                alpha: 0.8
+            });
+        }
+    } else {
+        raft.vx -= config.pushForce;
+        raft.vAngle -= 0.03;
+        for(let i=0; i<8; i++) {
+            particles.push({
+                x: raft.x + 30 + Math.random()*20,
+                y: raft.y + 10 + Math.random()*15,
+                vx: 2 + Math.random()*3,
+                vy: (Math.random()-0.5)*2,
+                radius: 6 + Math.random()*8,
+                alpha: 0.8
+            });
+        }
+    }
+}
+
+function resetGame() {
+    raft.x = canvas.width / 2;
+    raft.y = TRACK_HEIGHT - 300;
+    raft.vx = 0;
+    raft.vy = config.speed;
+    raft.angle = 0;
+    raft.vAngle = 0;
+    particles = [];
+    activeJumpscare = null;
+    generateMap();
+    gameState = 'PLAYING';
+}
+
+// Cập nhật logic game
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    raft.y += raft.vy;
+    raft.x += raft.vx;
+    raft.vx *= 0.92;
+    
+    raft.angle += raft.vAngle;
+    raft.vAngle *= 0.85;
+    raft.angle *= 0.92;
+
+    if (raft.x < 75) { raft.x = 75; raft.vx *= -0.5; playHitSound(); }
+    if (raft.x > canvas.width - 75) { raft.x = canvas.width - 75; raft.vx *= -0.5; playHitSound(); }
+
+    if (raft.y <= 150) {
+        gameState = 'WIN';
+        playWinSound();
+    }
+
+    // Kiểm tra xe có đi vào Vùng Đất Tối (Dark Zone) không
+    for (let dz of darkZones) {
+        if (!dz.triggered && raft.y <= dz.y + dz.height && raft.y >= dz.y - 100) {
+            dz.triggered = true;
+            activeJumpscare = {
+                timer: 50, // Số khung hình ma hù trực diện
+                alpha: 1.0
+            };
+            playJumpscareSound();
+        }
+    }
+
+    // Giảm thời gian hiển thị ma hù
+    if (activeJumpscare) {
+        activeJumpscare.timer--;
+        if (activeJumpscare.timer <= 0) {
+            activeJumpscare = null;
+        }
+    }
+
+    // Bong bóng nước
+    if (Math.random() < 0.3) {
+        bubbles.push({
+            x: 50 + Math.random() * (canvas.width - 100),
+            y: raft.y + 200 + Math.random() * 200,
+            radius: 2 + Math.random() * 4,
+            speed: 1 + Math.random() * 2
+        });
+    }
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+        bubbles[i].y -= bubbles[i].speed;
+        if (bubbles[i].y < cameraY) bubbles.splice(i, 1);
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.03;
+        if (p.alpha <= 0) particles.splice(i, 1);
+    }
+
+    // Va chạm bãi gai
+    for (let obs of obstacles) {
+        if (Math.abs(raft.y - obs.y) < 25) {
+            let hit = false;
+            if (obs.side === 'left' && raft.x - raft.width/2 < obs.width + 30) hit = true;
+            if (obs.side === 'right' && raft.x + raft.width/2 > canvas.width - obs.width - 30) hit = true;
+            if (hit) {
+                gameState = 'GAMEOVER';
+                playHitSound();
+            }
+        }
+    }
+
+    targetY = raft.y - canvas.height / 2 + 80;
+    cameraY += (targetY - cameraY) * 0.1;
+}
+
+// Vẽ đồ họa game
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(0, -cameraY);
+
+    // 1. Sông nước
+    ctx.fillStyle = '#112922';
+    ctx.fillRect(0, 0, canvas.width, TRACK_HEIGHT);
+
+    ctx.strokeStyle = '#1b4332';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < TRACK_HEIGHT; i += 80) {
+        ctx.beginPath();
+        ctx.moveTo(50, i);
+        ctx.bezierCurveTo(200, i + 20, 600, i - 20, 750, i);
+        ctx.stroke();
+    }
+
+    // 2. Vẽ Vùng Đất Tối (Dark Zones) dọc đường đi
+    for (let dz of darkZones) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.fillRect(45, dz.y, canvas.width - 90, dz.height);
+        
+        // Cảnh báo chữ ma quái mờ trong vùng tối
+        ctx.fillStyle = 'rgba(150, 0, 0, 0.4)';
+        ctx.font = 'bold 20px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ KHU VỰC TỬ THẦN - CẨN THẬN! ⚠️', canvas.width / 2, dz.y + dz.height / 2);
+    }
+
+    // 3. Bờ sông và Bãi gai
+    ctx.fillStyle = '#1b3b2b';
+    ctx.fillRect(0, 0, 45, TRACK_HEIGHT);
+    ctx.fillRect(canvas.width - 45, 0, 45, TRACK_HEIGHT);
+
+    for (let obs of obstacles) {
+        ctx.fillStyle = '#888';
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        if (obs.side === 'left') {
+            ctx.beginPath();
+            ctx.moveTo(45, obs.y - obs.height / 2);
+            ctx.lineTo(obs.width, obs.y);
+            ctx.lineTo(45, obs.y + obs.height / 2);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+        } else {
+            ctx.beginPath();
+            ctx.moveTo(canvas.width - 45, obs.y - obs.height / 2);
+            ctx.lineTo(canvas.width - obs.width, obs.y);
+            ctx.lineTo(canvas.width - 45, obs.y + obs.height / 2);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+        }
+    }
+
+    // 4. Vạch đích
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(45, 150, canvas.width - 90, 15);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🏁 VẠCH ĐÍCH CHIẾN THẮNG 🏁', canvas.width / 2, 162);
+
+    // 5. Bong bóng & hạt khí
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    for (let b of bubbles) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    for (let p of particles) {
+        ctx.fillStyle = `rgba(130, 220, 100, ${p.alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // 6. Phao bơi và 2 con thú
+    ctx.save();
+    ctx.translate(raft.x, raft.y);
+    ctx.rotate(raft.angle);
+
+    ctx.fillStyle = '#ff4757';
+    ctx.beginPath();
+    ctx.ellipse(0, 10, raft.width / 2, raft.height / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#ff6b81';
+    ctx.stroke();
+
+    ctx.fillStyle = '#112922';
+    ctx.beginPath();
+    ctx.ellipse(0, 10, raft.width / 3.5, raft.height / 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Thú trái (Gấu Panda rặn)
+    ctx.save();
+    ctx.translate(-35, -5);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.stroke();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-14, -16, 8, 0, Math.PI * 2); ctx.arc(14, -16, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-7, -4, 5, 0, Math.PI * 2); ctx.arc(7, -4, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // Thú phải (Mèo béo rặn)
+    ctx.save();
+    ctx.translate(35, -5);
+    ctx.fillStyle = '#ffa502';
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+    ctx.restore(); // Kết thúc camera translate
+
+    // 7. HIỆU ỨNG JUMPSCARE (MA HÙ TRỰC DIỆN HẾT HỒN)
+    if (activeJumpscare) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Vẽ khuôn mặt con ma đáng sợ nhảy chồm lên giữa màn hình
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        
+        // Đầu ma
+        ctx.fillStyle = '#dcdde1';
+        ctx.beginPath();
+        ctx.arc(0, 0, 130 + Math.random() * 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#e84118';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        // Mắt quỷ đỏ ngầu phát sáng
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath();
+        ctx.arc(-45, -20, 25, 0, Math.PI * 2);
+        ctx.arc(45, -20, 25, 0, Math.PI * 2);
+        ctx.fill();
+        // Tròng đen
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(-45, -20, 10, 0, Math.PI * 2);
+        ctx.arc(45, -20, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Miệng há rộng ngoác gầm rú
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(0, 40, 45, 60, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // Dòng chữ hù dọa giật gân
+        ctx.fillStyle = '#ff4757';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('👻 MA HÙ! CẨN THẬN! 👻', canvas.width / 2, 60);
+    }
+
+    // HUD tiến độ
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Tiến độ: ${Math.floor(((TRACK_HEIGHT - 300 - raft.y) / (TRACK_HEIGHT - 500)) * 100)}%`, 20, 30);
+    ctx.fillText(`Độ khó: ${difficulty}`, 20, 55);
+
+    // MÀN HÌNH MENU CHỌN ĐỘ KHÓ
+    if (gameState === 'MENU') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#ff4757';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('💨 FART RAFT: BẢN KINH DỊ 💨', canvas.width / 2, 80);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('Chọn mức độ khó để bắt đầu:', canvas.width / 2, 130);
+
+        // Nút chọn dễ
+        drawButton(canvas.width / 2, 180, 240, 45, '#2ed573', '1. DỄ (EASY)');
+        // Nút chọn thường
+        drawButton(canvas.width / 2, 240, 240, 45, '#ffa502', '2. THƯỜNG (NORMAL)');
+        // Nút chọn khó
+        drawButton(canvas.width / 2, 300, 240, 45, '#ff4757', '3. KHÓ (HARDCORE)');
+
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('💡 Mẹo: Nhấn các nút trên điện thoại hoặc phím A/D để chơi.', canvas.width / 2, 380);
+    }
+
+    // MÀN HÌNH GAME OVER
+    if (gameState === 'GAMEOVER') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ff4757';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('💥 ĐỤNG GAI / BỊ MA BẮT! 💥', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('Nhấn phím R hoặc Click để chơi lại', canvas.width / 2, canvas.height / 2 + 30);
+    }
+
+    // MÀN HÌNH THẮNG
+    if (gameState === 'WIN') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#2ed573';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🏆 VỀ ĐÍCH AN TOÀN! 🏆', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('Nhấn phím R hoặc Click để chơi ván mới', canvas.width / 2, canvas.height / 2 + 30);
+    }
+}
+
+function drawButton(x, y, w, h, color, text) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x - w/2, y - h/2, w, h);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - w/2, y - h/2, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+    ctx.textBaseline = 'alphabetic';
+}
+
+// Xử lý click chọn độ khó trên menu
+canvas.addEventListener('click', (e) => {
+    initAudio();
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (gameState === 'MENU') {
+        // Kiểm tra bấm nút Dễ
+        if (x > canvas.width/2 - 120 && x < canvas.width/2 + 120) {
+            if (y > 157 && y < 203) { setDifficulty('EASY'); resetGame(); }
+            if (y > 217 && y < 263) { setDifficulty('NORMAL'); resetGame(); }
+            if (y > 277 && y < 323) { setDifficulty('HARD'); resetGame(); }
+        }
+    } else if (gameState === 'GAMEOVER' || gameState === 'WIN') {
+        gameState = 'MENU';
+    }
+});
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
